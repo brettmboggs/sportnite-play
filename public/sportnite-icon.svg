@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7b2cff"/><stop offset="1" stop-color="#ff2c9c"/></linearGradient></defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#g)"/>
+  <circle cx="128" cy="112" r="62" fill="#ff7a1f" stroke="#2a0a4a" stroke-width="8"/>
+  <path d="M66 112h124M128 50v124M86 66c22 22 22 70 0 92M170 66c-22 22-22 70 0 92" stroke="#2a0a4a" stroke-width="7" fill="none"/>
+  <text x="128" y="222" font-family="Impact, Arial Black, sans-serif" font-size="44" font-weight="900" text-anchor="middle" fill="#ffd34d" stroke="#2a0a4a" stroke-width="5" paint-order="stroke">SPORTNITE</text>
+</svg>
