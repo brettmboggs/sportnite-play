@@ -159,6 +159,9 @@ export class Renderer {
     this.ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 8, samples: 12, rings: 2 });
     this.composer.addPass(this.ao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.45, 1.05);
+    // bloom is a soft glow, so below High it can run at half resolution and nobody can tell
+    const bloomSetSize = this.bloom.setSize.bind(this.bloom);
+    this.bloom.setSize = (w, h) => bloomSetSize(Math.max(1, Math.round(w * (this.bloomScale ?? 1))), Math.max(1, Math.round(h * (this.bloomScale ?? 1))));
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass(VignetteShader);
     this.vignette.uniforms.tAO.value = this.ao.gtaoMap;
@@ -200,6 +203,19 @@ export class Renderer {
     this.ao.maxPixels = q === 'high' ? 1.6e6 : 0.55e6;
     this.aoStrength = this.ao.enabled ? 0.85 : 0;
     this.smaa.enabled = q !== 'potato';
+    // Measured on an M1 laptop, shadows and AO were most of Medium's cost. Below High: a smaller shadow area (fewer
+    // objects drawn into the shadow map), small props stop casting shadows, half the AO samples, half-res bloom.
+    const box = q === 'high' ? 70 : q === 'medium' ? 50 : 40;
+    Object.assign(this.sun.shadow.camera, { left: -box, right: box, top: box, bottom: -box });
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.propShadows = q === 'high';
+    const samples = q === 'high' ? 12 : 6;
+    if (this.aoSamples !== samples) {
+      this.aoSamples = samples;
+      this.ao.updateGtaoMaterial({ samples });
+      this.ao.updatePdMaterial({ samples });
+    }
+    this.bloomScale = q === 'high' ? 1 : 0.5;
     // how far you can see (1 = everything); the fog and the far clip plane both shrink with it
     this.viewScale = q === 'potato' ? 0.45 : q === 'low' ? 0.75 : 1;
     // draw distance for props, buildings, loot and vehicles (read by the world, loot and vehicles each frame)

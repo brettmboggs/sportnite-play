@@ -326,7 +326,7 @@ export class World {
       for (const im of inst.meshes) tris += (im.geometry.index ? im.geometry.index.count : im.geometry.attributes.position.count) / 3;
       const viewDist = h < 1.6 ? 150 : h < 4 ? 320 : tris > 2500 ? 520 : Infinity;
       this.chunks ??= [];
-      this.chunks.push({ inst, cx: (Math.floor(x / CHUNK) + 0.5) * CHUNK, cz: (Math.floor(z / CHUNK) + 0.5) * CHUNK, viewDist });
+      this.chunks.push({ inst, h, cx: (Math.floor(x / CHUNK) + 0.5) * CHUNK, cz: (Math.floor(z / CHUNK) + 0.5) * CHUNK, viewDist });
     }
     return this.instancers.get(key);
   }
@@ -1103,6 +1103,11 @@ export class World {
     }
     for (const a of this.animated) a.update(dt, time);
     this.updateStaticCulling(dt);
+    // mid-size props (bushes, rocks, crates) only cast shadows on High graphics
+    if (this.chunks && this.propShadows !== this.propShadowsApplied) {
+      this.propShadowsApplied = this.propShadows;
+      for (const ch of this.chunks) if (ch.h >= 1.6 && ch.h < 4) for (const im of ch.inst.meshes) im.castShadow = this.propShadows !== false;
+    }
     // distance culling for prop chunks (a few times a second is plenty)
     this.cullT = (this.cullT ?? 0) - dt;
     if (this.chunks && this.cullT <= 0) {
