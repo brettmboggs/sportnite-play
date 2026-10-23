@@ -115,7 +115,7 @@ export class PlayerController {
     }
     if (!best) return;
     const to = best.center.sub(cam.cam.position).normalize();
-    const yaw = Math.atan2(-to.x, -to.z), pitch = Math.asin(to.y);
+    const yaw = Math.atan2(-to.x, -to.z), pitch = Math.asin(Math.max(-1, Math.min(1, to.y)));
     let dy = yaw - cam.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
     const k = Math.min(1, dt * 4) * (this.game.settings.aimAssist ?? 1);
     cam.yaw += dy * k * 0.5; cam.pitch += (pitch - cam.pitch) * k * 0.3;

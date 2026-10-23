@@ -267,6 +267,7 @@ export class Audio {
 
   // ---------- spatial helpers ----------
   setListener(pos, fwd) {
+    if (!Number.isFinite(pos.x + pos.y + pos.z + fwd.x + fwd.y + fwd.z)) return; // Web Audio throws on NaN
     const L = this.listener;
     L.x = pos.x; L.y = pos.y; L.z = pos.z;
     const h = Math.hypot(fwd.x, fwd.z);

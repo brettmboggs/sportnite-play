@@ -356,6 +356,12 @@ export class Character {
 
   applyMovement(dt) {
     const g = this.game, ctrl = g.kcc;
+    // a NaN speed (from some bad math elsewhere) would send the body, and the camera following it, into nowhere
+    if (!Number.isFinite(this.vel.x + this.vel.y + this.vel.z)) {
+      console.warn('[sportnite] NaN velocity on', this.name, this.state, this.vel.toArray());
+      this.vel.set(0, 0, 0);
+    }
+    if (!Number.isFinite(this.pos.x + this.pos.y + this.pos.z) && this.goodPos) this.setPosition(this.goodPos);
     const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
     ctrl.computeColliderMovement(this.collider, desired, undefined, undefined, (col) => {
       const o = g.physics.owners.get(col.handle);
@@ -374,8 +380,10 @@ export class Character {
     if (!this.grounded && desired.y > 0 && m.y < desired.y * 0.5) this.vel.y = Math.min(this.vel.y, 0);
     const t = this.body.translation();
     const nx = t.x + m.x, ny = t.y + m.y, nz = t.z + m.z;
+    if (!Number.isFinite(nx + ny + nz)) { if (this.goodPos) this.setPosition(this.goodPos); return; }
     this.body.setNextKinematicTranslation({ x: nx, y: ny, z: nz });
     this.pos.set(nx, ny - HALF - RADIUS, nz);
+    (this.goodPos ??= new THREE.Vector3()).copy(this.pos);
     // safety: never fall through the terrain
     const gy = g.world.groundY(this.pos.x, this.pos.z);
     if (this.pos.y < gy - 1.5) { this.pos.y = gy + 0.1; this.body.setNextKinematicTranslation({ x: nx, y: this.pos.y + HALF + RADIUS, z: nz }); this.vel.y = 0; }

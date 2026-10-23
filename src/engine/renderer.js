@@ -349,6 +349,15 @@ export class Renderer {
   }
 
   render(dt) {
+    // never draw from a broken camera (NaN position/rotation draws nothing, or a white screen on some laptops):
+    // put it back where it last was fine
+    const c = this.camera, p = c.position, q = c.quaternion;
+    if (Number.isFinite(p.x + p.y + p.z + q.x + q.y + q.z + q.w)) {
+      (this._goodCamPos ??= new THREE.Vector3()).copy(p); (this._goodCamQuat ??= new THREE.Quaternion()).copy(q);
+    } else if (this._goodCamPos) {
+      console.warn('[sportnite] camera went NaN, restoring it');
+      p.copy(this._goodCamPos); q.copy(this._goodCamQuat); c.updateMatrixWorld();
+    }
     const vu = this.vignette.uniforms;
     vu.uAO.value = this.ao.enabled ? (this.aoStrength ?? 1) : 0;
     vu.uNear.value = this.camera.near; vu.uFar.value = this.camera.far;

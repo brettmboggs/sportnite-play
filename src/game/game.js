@@ -396,6 +396,8 @@ export class Game {
   }
 
   frame(dt) {
+    if (!(dt >= 0)) dt = 0; // the very first frame can come out slightly negative
+    this.healLighting();
     this.input.update(dt);
     this.time += dt;
     if (this.state === 'lobby') {
@@ -541,8 +543,37 @@ export class Game {
     return alive || this.player;
   }
 
+  // The sky, fog and light colours below ease toward their targets every frame, so a single NaN (from a broken
+  // camera or physics glitch) would stick forever and turn the whole picture white or black, even in the lobby.
+  // Remember the good starting values and put them back if anything ever goes bad.
+  healLighting() {
+    const r = this.renderer, vu = r.vignette.uniforms, fog = this.scene.fog;
+    const vals = () => [fog.color.r, fog.color.g, fog.color.b, fog.near, fog.far, r.sun.intensity, r.hemi.intensity,
+      r.hemi.color.r, r.hemi.groundColor.r, r.skyUniforms.top.value.r, r.skyUniforms.horizon.value.r,
+      vu.uSat.value, vu.uContrast.value, vu.uStorm.value, vu.uDamage.value, vu.uFreeze.value,
+      r.renderer.toneMappingExposure, rimUniforms.uRimStrength.value, rimUniforms.uRimColor.value.r];
+    if (!this.goodLight) {
+      this.goodLight = {
+        fog: fog.color.clone(), near: fog.near, far: fog.far, sun: r.sun.intensity, hemi: r.hemi.intensity,
+        hc: r.hemi.color.clone(), hg: r.hemi.groundColor.clone(), top: r.skyUniforms.top.value.clone(),
+        hor: r.skyUniforms.horizon.value.clone(), rim: rimUniforms.uRimStrength.value, rimC: rimUniforms.uRimColor.value.clone(),
+      };
+    }
+    if (Number.isFinite(vals().reduce((a, b) => a + b, 0))) return;
+    console.warn('[sportnite] lighting went NaN, restoring it', { cam: this.cameraRig.cam.position.toArray(), player: this.player?.pos?.toArray(), state: this.state });
+    const L = this.goodLight;
+    fog.color.copy(L.fog); fog.near = L.near; fog.far = L.far;
+    r.sun.intensity = L.sun; r.hemi.intensity = L.hemi; r.hemi.color.copy(L.hc); r.hemi.groundColor.copy(L.hg);
+    r.skyUniforms.top.value.copy(L.top); r.skyUniforms.horizon.value.copy(L.hor);
+    rimUniforms.uRimStrength.value = L.rim; rimUniforms.uRimColor.value.copy(L.rimC);
+    vu.uStorm.value = 0; vu.uDamage.value = 0; vu.uFreeze.value = 0;
+    r.resetGrade();
+  }
+
   // blend sky/fog colors per biome: spooky purple fog in the haunted forest, pink sky in candyland
   biomeLighting(dt) {
+    const cp = this.cameraRig.cam.position;
+    if (!Number.isFinite(cp.x + cp.y + cp.z)) return; // a broken camera would poison every colour below
     const b = this.world.terrain.biomeWeights(this.cameraRig.cam.position.x, this.cameraRig.cam.position.z);
     const mix = (key, a) => {
       const out = new THREE.Color(0, 0, 0);

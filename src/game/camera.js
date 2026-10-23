@@ -57,6 +57,14 @@ export class CameraRig {
 
   update(dt, target, { aiming = false, scope = 0, skydive = false, sprint = false, dead = false } = {}) {
     const ch = target;
+    // never let a bad number stick in the camera's angles or distance (it would blank the screen for good)
+    if (!Number.isFinite(this.yaw + this.pitch + this.curDist + this.kick)) {
+      console.warn('[sportnite] camera angles went NaN, resetting', { yaw: this.yaw, pitch: this.pitch, dist: this.curDist });
+      if (!Number.isFinite(this.yaw)) this.yaw = 0;
+      if (!Number.isFinite(this.pitch)) this.pitch = 0;
+      if (!Number.isFinite(this.curDist)) this.curDist = 3.3;
+      if (!Number.isFinite(this.kick)) this.kick = 0;
+    }
     if (ch.vehicle && !dead) { this.vehicleCam(dt, ch.vehicle, ch); return; }
     this.ads = damp(this.ads, aiming ? 1 : 0, 14, dt);
     this.scoped = aiming && scope > 0;
