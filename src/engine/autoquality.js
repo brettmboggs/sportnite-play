@@ -84,3 +84,24 @@ export class DynamicResolution {
   atTop() { return this.scale >= 0.999; }
   reset(scale = 1) { this.scale = scale; this.t = 0; this.n = 0; this.cool = 1; this.upWait = 3; this.failAt = 2; this.failT = 0; }
 }
+
+// Some browsers lock pages to 30 FPS to save battery (Chrome's Energy Saver when a laptop is unplugged, Low Power
+// Mode on a Mac). Then every frame lands exactly 33.3 ms apart even though the game's own work is quick. Lowering
+// the graphics can't help with that, so Auto should leave them alone and tell the player instead.
+export class FrameCapDetector {
+  constructor() { this.capped = false; this.reset(); }
+
+  reset() { this.frames = []; this.t = 0; }
+
+  update(dt, workMs) {
+    this.frames.push([dt * 1000, workMs]);
+    this.t += dt;
+    if (this.t < 2) return this.capped;
+    const n = this.frames.length;
+    const locked = this.frames.filter(([ms]) => ms > 32.3 && ms < 34.3).length;
+    const work = this.frames.reduce((a, [, w]) => a + w, 0) / n;
+    this.capped = locked / n > 0.85 && work < 20;
+    this.frames = []; this.t = 0;
+    return this.capped;
+  }
+}

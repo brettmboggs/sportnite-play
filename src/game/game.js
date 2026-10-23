@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Renderer } from '../engine/renderer.js';
-import { AutoQuality, DynamicResolution, QUALITY_LEVELS } from '../engine/autoquality.js';
+import { AutoQuality, DynamicResolution, FrameCapDetector, QUALITY_LEVELS } from '../engine/autoquality.js';
 import { rimUniforms } from '../engine/stylize.js';
 import { physics } from '../engine/physics.js';
 import { Input } from '../engine/input.js';
@@ -407,7 +407,9 @@ export class Game {
       this.rawDt = (now - last) / 1000; // real frame time (auto graphics measures with this)
       let dt = Math.min(0.05, this.rawDt);
       last = now;
+      const t0 = performance.now();
       this.frame(dt);
+      this.workMs = performance.now() - t0; // how long the game's own work took (the battery-cap check uses it)
     };
     requestAnimationFrame(loop);
   }
@@ -439,6 +441,31 @@ export class Game {
 
   updateAutoQuality() {
     if (!this.autoQuality || this.state !== 'match') return;
+    this.capCheck ??= new FrameCapDetector();
+    const capped = this.capCheck.update(this.rawDt, this.workMs ?? 0);
+    if (this.capProbe) {
+      // a slow graphics chip can also land on exactly 30 FPS; at half resolution it would speed up, a battery cap won't
+      this.capProbe.t -= this.rawDt;
+      if (this.capProbe.t > 0) return;
+      if (this.capCheck.capped) this.capConfirmed = true; else this.capRuledOut = true;
+      this.renderer.setRenderScale(this.capProbe.scale);
+      this.capProbe = null;
+      return;
+    }
+    if (capped && !this.capRuledOut) {
+      if (!this.capConfirmed) {
+        this.capProbe = { t: 2.6, scale: this.renderer.renderScale ?? 1 };
+        this.capCheck.reset();
+        this.renderer.setRenderScale(0.5);
+        return;
+      }
+      // the browser is holding the game at 30 FPS to save battery: lower graphics wouldn't help, so don't touch them
+      if (!this.capTipShown) {
+        this.capTipShown = true;
+        this.hud.toast('🔋 Your browser is holding the game at 30 FPS to save battery. Plug in (or turn off Energy Saver) for smoother play!');
+      }
+      return;
+    }
     const scale = this.dynRes.update(this.rawDt);
     if (scale) this.renderer.setRenderScale(scale);
     const level = this.autoQuality.update(this.rawDt, this.dynRes.atFloor(), this.dynRes.atTop());
