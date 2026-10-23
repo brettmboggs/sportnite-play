@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Renderer } from '../engine/renderer.js';
-import { AutoQuality, QUALITY_LEVELS } from '../engine/autoquality.js';
+import { AutoQuality, DynamicResolution, QUALITY_LEVELS } from '../engine/autoquality.js';
 import { rimUniforms } from '../engine/stylize.js';
 import { physics } from '../engine/physics.js';
 import { Input } from '../engine/input.js';
@@ -129,9 +129,12 @@ export class Game {
     this.cameraRig.fovBase = s.fov;
     if (s.quality === 'auto') {
       this.autoQuality ??= new AutoQuality(s.autoLevel);
+      this.dynRes ??= new DynamicResolution();
       if (this.renderer.quality !== this.autoQuality.level) this.renderer.setQuality(this.autoQuality.level);
     } else {
       this.autoQuality = null;
+      this.dynRes = null;
+      this.renderer.renderScale = 1;
       this.renderer.setQuality(s.quality);
     }
     audio.volume = { master: s.master, sfx: s.sfx, music: s.music };
@@ -436,8 +439,14 @@ export class Game {
 
   updateAutoQuality() {
     if (!this.autoQuality || this.state !== 'match') return;
-    const level = this.autoQuality.update(this.rawDt);
+    const scale = this.dynRes.update(this.rawDt);
+    if (scale) this.renderer.setRenderScale(scale);
+    const level = this.autoQuality.update(this.rawDt, this.dynRes.atFloor(), this.dynRes.atTop());
     if (!level) return;
+    // a cheaper level starts back at full resolution; a fancier one starts a bit lower and earns its way up
+    const down = QUALITY_LEVELS.indexOf(level) < QUALITY_LEVELS.indexOf(this.renderer.quality);
+    this.dynRes.reset(down ? 1 : 0.8);
+    this.renderer.renderScale = this.dynRes.scale;
     this.renderer.setQuality(level);
     this.settings.autoLevel = level; // next time the game starts at the level that worked
     this.save.write();

@@ -187,8 +187,7 @@ export class Renderer {
   setQuality(q) {
     this.quality = q;
     const dpr = Math.min(devicePixelRatio, 2);
-    const pr = q === 'potato' ? 0.75 : q === 'low' ? 1 : q === 'medium' ? Math.min(dpr, 1.5) : dpr;
-    this.renderer.setPixelRatio(pr);
+    this.basePR = q === 'potato' ? 0.75 : q === 'low' ? 1 : q === 'medium' ? Math.min(dpr, 1.5) : dpr;
     const map = q === 'potato' || q === 'low' ? 1024 : q === 'medium' ? 2048 : 4096;
     this.sun.shadow.mapSize.set(map, map);
     if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
@@ -350,8 +349,22 @@ export class Renderer {
     this.sky.position.copy(this.camera.position);
   }
 
+  // Render resolution: the quality level's pixel ratio, capped to a pixel budget (so a Retina laptop on High doesn't
+  // draw 5 million pixels a frame), times the dynamic-resolution scale that Auto graphics adjusts to hold 60 FPS.
+  pixelRatioFor(w, h) {
+    const budget = { potato: 0.9e6, low: 1.4e6, medium: 2.3e6, high: 3.7e6 }[this.quality] ?? 3.7e6;
+    const pr = Math.min(this.basePR ?? Math.min(devicePixelRatio, 2), Math.sqrt(budget / (w * h)));
+    return Math.max(0.5, pr * (this.renderScale ?? 1));
+  }
+
+  setRenderScale(s) {
+    this.renderScale = s;
+    this.resize();
+  }
+
   resize() {
     const w = innerWidth, h = innerHeight;
+    this.renderer.setPixelRatio(this.pixelRatioFor(w, h));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
