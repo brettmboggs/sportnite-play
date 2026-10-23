@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Renderer } from '../engine/renderer.js';
-import { AutoQuality } from '../engine/autoquality.js';
+import { AutoQuality, QUALITY_LEVELS } from '../engine/autoquality.js';
 import { rimUniforms } from '../engine/stylize.js';
 import { physics } from '../engine/physics.js';
 import { Input } from '../engine/input.js';
@@ -89,6 +89,20 @@ export class Game {
     this.glider = new Glider(this);
     this.vehicles = new Vehicles(this);
     this.hud = new Hud(this);
+    // A weak or overheated graphics chip can crash ("context lost") and leave a white or black screen for good.
+    // Step the graphics down one level and reload, so the game comes back by itself.
+    this.renderer.dom.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('[sportnite] graphics chip crashed (WebGL context lost) on', this.renderer.quality);
+      const s = this.settings, i = QUALITY_LEVELS.indexOf(this.renderer.quality);
+      if (s.quality === 'auto') s.autoLevel = QUALITY_LEVELS[Math.max(0, i - 1)];
+      this.save.write();
+      const msg = document.createElement('div');
+      msg.textContent = '⚙️ Graphics hiccup! Turning graphics down and restarting...';
+      msg.style.cssText = 'position:fixed;inset:0;display:grid;place-items:center;background:#12082e;color:#fff;font:24px sans-serif;z-index:99999';
+      document.body.appendChild(msg);
+      setTimeout(() => location.reload(), 2000);
+    });
     this.lobby = new Lobby(this);
     this.menu = new Menu(this);
     this.applySettings();
