@@ -792,7 +792,7 @@ export class Vehicles {
         v.syncBody();
       } else v.updateQuat(dt); // keeps the suspension spring settling
       if (v.pos.y < -30) { v.explode(); continue; }
-      const far = v.pos.distanceToSquared(cam) > 320 * 320;
+      const far = v.pos.distanceToSquared(cam) > (260 * (g.renderer.drawScale ?? 1)) ** 2;
       v.mesh.visible = !far;
       if (v.mesh.userData.beacon) v.mesh.userData.beacon.visible = !far && !ch && !v.awake;
       if (far) continue;

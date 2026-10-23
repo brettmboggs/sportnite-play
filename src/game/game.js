@@ -445,6 +445,7 @@ export class Game {
   }
 
   updateWorld(dt) {
+    this.world.drawScale = this.renderer.drawScale;
     this.world.update(dt, this.time);
     this.effects.update(dt);
     this.building.update(dt);

@@ -178,6 +178,7 @@ export class Renderer {
 
     this.quality = 'high';
     this.viewScale = 1;
+    this.drawScale = 1;
     addEventListener('resize', () => this.resize());
   }
 
@@ -202,6 +203,8 @@ export class Renderer {
     this.smaa.enabled = q !== 'potato';
     // how far you can see (1 = everything); the fog and the far clip plane both shrink with it
     this.viewScale = q === 'potato' ? 0.45 : q === 'low' ? 0.75 : 1;
+    // draw distance for props, buildings, loot and vehicles (read by the world, loot and vehicles each frame)
+    this.drawScale = { potato: 0.45, low: 0.65, medium: 0.85, high: 1 }[q];
     this.camera.far = 3000 * this.viewScale;
     this.sky.scale.setScalar(this.viewScale); // the sky dome has to stay inside the far plane or it gets clipped away
     this.renderer.sportniteQuality = q; // the grass reads this to pick how far it grows

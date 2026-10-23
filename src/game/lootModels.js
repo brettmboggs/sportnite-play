@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvasTexture } from '../engine/utils.js';
 
 // Procedural 3D models for everything you can find on the floor: potions, med kits, ammo, materials,
@@ -17,6 +18,26 @@ function add(g, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
   m.castShadow = true;
   g.add(m);
   return m;
+}
+
+// Fuse a group's direct child meshes into one mesh per material (same look, far fewer draw calls).
+// The fused geometry is cached by `key`, so every copy of the model shares it.
+function mergeParts(parent, key, keep = []) {
+  const byMat = new Map();
+  for (const m of [...parent.children]) {
+    if (!m.isMesh || keep.includes(m)) continue;
+    if (!byMat.has(m.material)) byMat.set(m.material, []);
+    byMat.get(m.material).push(m);
+  }
+  let i = 0;
+  for (const [mat, parts] of byMat) {
+    const geo = G(`merged:${key}:${i++}`, () => mergeGeometries(parts.map((p) => { p.updateMatrix(); return p.geometry.clone().applyMatrix4(p.matrix); })));
+    const merged = new THREE.Mesh(geo, mat);
+    merged.castShadow = parts.some((p) => p.castShadow);
+    merged.userData.mainShadow = parts.some((p) => p.userData.mainShadow);
+    for (const p of parts) parent.remove(p);
+    parent.add(merged);
+  }
 }
 
 function labelTex(text, bg, fg = '#fff') {
@@ -202,6 +223,9 @@ export function chestModel(rare = false) {
   // inner glow that shows when the lid opens
   const inner = add(g, G('chestInner', () => new THREE.PlaneGeometry(W - 0.1, D - 0.1)), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd36a).multiplyScalar(2.2), toneMapped: false, transparent: true }), 0, H - 0.04, 0, -Math.PI / 2);
   inner.castShadow = false;
+  // 17 parts would be 17 draw calls per chest (600+ with a few dozen in view): fuse them per material instead
+  mergeParts(g, 'chestBody', [inner]);
+  mergeParts(lid, 'chestLid');
   // only the body casts a shadow: 17 shadow casters per chest adds up fast
   g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = !!o.userData.mainShadow; } });
   return { root: g, lid, inner };

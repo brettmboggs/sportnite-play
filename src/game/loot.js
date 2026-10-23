@@ -14,7 +14,7 @@ const PICK_RANGE = 3.0;   // how far away you can grab floor loot
 const MAGNET = 3.2;       // ammo / mats / gold fly to you inside this range
 const CHEST_FADE = 6;     // seconds an opened chest stays before sinking away
 const UP = new THREE.Vector3(0, 1, 0);
-const CULL_ITEM = 140, CULL_CHEST = 220; // loot farther than this from the camera isn't drawn
+const CULL_ITEM = 130, CULL_CHEST = 170; // loot farther than this from the camera isn't drawn
 const noShadow = (o) => o.traverse((m) => { if (m.isMesh) m.castShadow = false; });
 
 const emojiTex = new Map();
@@ -509,10 +509,11 @@ export class Loot {
     this.cullT = (this.cullT || 0) - 1;
     if (this.cullT > 0) return;
     this.cullT = 8;
-    const cam = this.game.cameraRig.cam.position;
-    for (const it of this.items) it.root.visible = it.pos.distanceToSquared(cam) < CULL_ITEM * CULL_ITEM;
-    for (const c of this.chests) if (!c.supply) c.root.visible = c.pos.distanceToSquared(cam) < CULL_CHEST * CULL_CHEST;
-    for (const m of this.machines) m.root.visible = m.pos.distanceToSquared(cam) < CULL_CHEST * CULL_CHEST;
+    const cam = this.game.cameraRig.cam.position, k = this.game.renderer.drawScale ?? 1;
+    const ci = (CULL_ITEM * k) ** 2, cc = (CULL_CHEST * k) ** 2;
+    for (const it of this.items) it.root.visible = it.pos.distanceToSquared(cam) < ci;
+    for (const c of this.chests) if (!c.supply) c.root.visible = c.pos.distanceToSquared(cam) < cc;
+    for (const m of this.machines) m.root.visible = m.pos.distanceToSquared(cam) < cc;
   }
 
   updateChest(c, dt, time) {

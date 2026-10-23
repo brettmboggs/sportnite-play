@@ -88,6 +88,7 @@ export class World {
     onStep('Growing grass');
     this.buildGrass();
     this.buildAmbient();
+    this.setupStaticCulling();
     // one physics step so raycasts (loot snapping, spawn checks) can see every collider right away
     this.physics.world.step();
   }
@@ -1101,6 +1102,7 @@ export class World {
       }
     }
     for (const a of this.animated) a.update(dt, time);
+    this.updateStaticCulling(dt);
     // distance culling for prop chunks (a few times a second is plenty)
     this.cullT = (this.cullT ?? 0) - dt;
     if (this.chunks && this.cullT <= 0) {
@@ -1108,11 +1110,49 @@ export class World {
       const c = this.camPos;
       for (const ch of this.chunks) {
         const d = Math.hypot(ch.cx - c.x, ch.cz - c.z) - CHUNK * 0.71;
-        const vis = d < ch.viewDist + Math.max(0, c.y - 40) * 0.5;
+        const vis = d < Math.min(ch.viewDist, 900) * (this.drawScale ?? 1) + Math.max(0, c.y - 40) * 0.5;
         if (ch.vis !== vis) { ch.vis = vis; for (const im of ch.inst.meshes) im.visible = vis; }
       }
     }
   }
 
   groundY(x, z) { return this.terrain.heightAt(x, z); }
+
+  // Draw distance for everything static that isn't an instanced prop (buildings, houses, venues, fences, signs...).
+  // Bigger things stay visible farther away; lower graphics levels shrink every distance (drawScale).
+  // Uses layers instead of .visible so it never fights other code that shows/hides things.
+  setupStaticCulling() {
+    const skip = new Set();
+    for (const inst of this.instancers.values()) for (const im of inst.meshes) skip.add(im);
+    const box = new THREE.Box3(), sphere = new THREE.Sphere();
+    this.statics = [];
+    const consider = (o) => {
+      if (skip.has(o) || o.isLight || o.isPoints || o.isLine || o.isSprite || o === this.terrain.mesh || o.name === 'grass' || o.name === 'terrain') return;
+      let meshes = 0; o.traverse((m) => { if (m.isMesh) meshes++; });
+      if (!meshes) return;
+      box.setFromObject(o);
+      if (box.isEmpty()) return;
+      box.getBoundingSphere(sphere);
+      if (sphere.radius > 300) return; // sky, water, the whole island: always drawn
+      this.statics.push({ obj: o, x: sphere.center.x, z: sphere.center.z, r: sphere.radius, dist: 140 + sphere.radius * 45, vis: true });
+    };
+    for (const o of [...this.scene.children]) if (o !== this.root) consider(o);
+    for (const o of [...this.root.children]) consider(o);
+    this.staticT = 0;
+  }
+
+  updateStaticCulling(dt) {
+    if (!this.statics) return;
+    this.staticT -= dt;
+    if (this.staticT > 0) return;
+    this.staticT = 0.25;
+    const c = this.camPos, k = this.drawScale ?? 1, lift = Math.max(0, c.y - 40) * 0.5;
+    for (const st of this.statics) {
+      const d = Math.hypot(st.x - c.x, st.z - c.z) - st.r;
+      const vis = d < st.dist * k + lift;
+      if (vis === st.vis) continue;
+      st.vis = vis;
+      st.obj.traverse((m) => { if (vis) m.layers.enable(0); else m.layers.disable(0); });
+    }
+  }
 }
