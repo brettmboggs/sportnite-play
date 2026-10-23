@@ -162,6 +162,14 @@ export class Renderer {
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass(VignetteShader);
     this.vignette.uniforms.tAO.value = this.ao.gtaoMap;
+    // The composer swaps its two buffers every frame when AO is off (low/potato). The grade pass must always read
+    // the depth of the buffer it reads colour from: a stale one can be attached to the buffer it is drawing into,
+    // the GPU refuses that draw, and every other frame comes out black or white (a strobing screen).
+    const vignetteRender = this.vignette.render.bind(this.vignette);
+    this.vignette.render = (renderer, writeBuffer, readBuffer, dt, mask) => {
+      this.vignette.uniforms.tDepth.value = readBuffer.depthTexture;
+      vignetteRender(renderer, writeBuffer, readBuffer, dt, mask);
+    };
     this.ao.composite = this.vignette.uniforms;
     this.composer.addPass(this.vignette);
     this.composer.addPass(new OutputPass());
